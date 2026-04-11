@@ -1,4 +1,3 @@
-
 ---
 name: privacy-engineer
 description: >
@@ -7,10 +6,10 @@ description: >
   data collection practices, consent handling, or data retention. Also use when asked
   to review privacy policies, privacy notices, terms of service, cookie banners, or
   any user-facing privacy content for completeness, accuracy, and regulatory alignment.
-  Frameworks: CCPA/CPRA, OWASP Top 10 Privacy Risks, NIST Privacy Framework.
+  Frameworks: CCPA/CPRA, OWASP Top 10 Privacy Risks, OWASP API Security Top 10, NIST Privacy Framework.
 metadata:
   author: migmaqer
-  version: '1.0'
+  version: '1.1'
 ---
 
 # Privacy Engineer
@@ -25,12 +24,13 @@ Use this skill when the user asks you to:
 - Audit data collection, consent flows, or data retention logic
 - Review privacy policies, privacy notices, or terms of service for completeness
 - Check cookie banners or consent UIs for regulatory compliance
-- Assess alignment with CCPA/CPRA, OWASP Privacy Risks, or NIST Privacy Framework
+- Assess alignment with CCPA/CPRA, OWASP Privacy Risks, OWASP API Security Top 10, or NIST Privacy Framework
+- Review OpenAPI/Swagger specs or API designs for privacy risks
 - Perform a privacy-by-design review of a feature, service, or architecture
 
 ## Frameworks
 
-This skill references three frameworks. Apply whichever are relevant to the review context:
+This skill references four frameworks. Apply whichever are relevant to the review context:
 
 ### CCPA / CPRA
 
@@ -57,6 +57,33 @@ Check for these risks in code and architecture:
 8. Outdated personal data retained without correction mechanisms
 9. Missing or insufficient session expiry
 10. Insecure data transfer (unencrypted PII in transit)
+
+### OWASP API Security Top 10 (2023)
+
+Apply when reviewing API code, OpenAPI specs, or API gateway configurations. Each risk maps to a privacy impact:
+
+| # | Risk | Privacy Impact |
+|---|------|---------------|
+| API1 | Broken Object Level Authorization (BOLA) | Unauthorized access to other users' personal data via object IDs |
+| API2 | Broken Authentication | Attacker obtains tokens/credentials to access PII-bearing endpoints |
+| API3 | Broken Object Property Level Authorization | Endpoint returns fields (e.g., SSN, DOB) the caller should not see — mass assignment or over-fetching |
+| API4 | Unrestricted Resource Consumption | Bulk enumeration of user data via unconstrained pagination or rate-limitless endpoints |
+| API5 | Broken Function Level Authorization | Privileged endpoints (admin user export, bulk data download) accessible to lower-privilege callers |
+| API6 | Unrestricted Access to Sensitive Business Flows | Automated abuse of flows that collect or expose personal data (account takeover, registration scraping) |
+| API7 | Server-Side Request Forgery (SSRF) | Internal data stores holding PII reachable via SSRF |
+| API8 | Security Misconfiguration | Verbose error messages exposing PII; missing CORS restrictions; debug endpoints enabled in prod |
+| API9 | Improper Inventory Management | Shadow/deprecated API versions still active and exposing personal data without controls |
+| API10 | Unsafe Consumption of APIs | Third-party API responses trusted without validation, leading to PII injection or leakage |
+
+Key checks for API reviews:
+
+- **Object-level auth:** Every endpoint that returns personal data must verify the caller owns or has permission to access that specific object — check for BOLA patterns (e.g., sequential IDs in path params)
+- **Field-level filtering:** Response schemas must not return fields beyond what the caller's role requires — flag any `SELECT *` patterns or unfiltered ORM serialization
+- **Pagination and rate limiting:** Endpoints returning lists of users or personal data must have rate limits and max page sizes to prevent bulk harvesting
+- **Token and session scope:** JWT or OAuth scopes must be validated per endpoint; no implicit elevation
+- **Error responses:** 4xx/5xx responses must not echo back PII (e.g., `User with email X not found`)
+- **Deprecated versions:** Identify `/v1/`, `/beta/`, or undocumented endpoints that may bypass newer privacy controls
+- **Third-party API trust:** Validate and sanitize all data received from external APIs before storing or returning to clients
 
 ### NIST Privacy Framework (Core Functions)
 
@@ -103,6 +130,21 @@ Examine the code for:
 8. **Session management** — Sessions that never expire or lack proper invalidation
 9. **De-identification** — Opportunities to pseudonymize or anonymize data that are missed
 10. **Breach surface** — Error handling that could expose PII; missing audit logging
+
+#### For API Reviews (additional checks via OWASP API Top 10)
+
+When the artifact is an API implementation, OpenAPI/Swagger spec, or API gateway config, additionally check:
+
+1. **BOLA / object auth** — Path parameters (user IDs, account IDs) validated against the authenticated caller's ownership
+2. **Over-fetching / mass assignment** — Response objects filtered to only return fields the caller is authorized to receive; no `SELECT *` or unfiltered serializers
+3. **Bulk data harvesting** — Paginated list endpoints have rate limits and maximum page size caps; no unrestricted exports
+4. **Function-level authorization** — Admin or elevated-privilege endpoints (bulk export, user search) enforce role checks
+5. **Verbose errors** — 4xx/5xx responses do not reveal PII (email addresses, usernames) in error messages or response bodies
+6. **Deprecated / shadow endpoints** — All active API versions inventoried; older versions either decommissioned or subject to the same privacy controls as current versions
+7. **Scope validation** — OAuth2/JWT scopes explicitly validated per endpoint; no implicit escalation
+8. **Third-party API consumption** — External API responses sanitized before storing or forwarding; no blind trust of upstream data
+9. **SSRF exposure** — User-controlled URLs or identifiers cannot be used to reach internal data stores
+10. **CORS and transport security** — CORS policy does not allow wildcard origins on endpoints that return personal data; all traffic over TLS
 
 #### For Content Reviews
 
